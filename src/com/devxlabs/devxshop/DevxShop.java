@@ -15,9 +15,13 @@ import org.json.JSONObject;
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 
+import com.devxlabs.devxshop.Product;
+import com.devxlabs.devxshop.Customer;
+
+
 @DesignerComponent(
 	version = 1,
-	versionName = "1.0",
+	versionName = "1.5",
 	description = "Extension component for DevxShop. Created using Rush.",
 	iconName = "icon.jpeg"
 )
@@ -26,6 +30,7 @@ public class DevxShop extends AndroidNonvisibleComponent {
     private HashMap<String, String> productNames;
     private HashMap<String, Customer> customers;
     private HashMap<String, String> customerUsernames;
+    private HashMap<String, String> wishlist;
 
     private int productIdCounter = 1;
     private int customerIdCounter = 1;
@@ -49,7 +54,7 @@ public void AddProduct(String name, String description, String image, double pri
         return;
     }
     if (productNames.containsKey(name)) {
-        ProductAlreadyExists(name); // Check by product name
+        ProductAlreadyExists(name);
     } else {
         String id = "PROD-" + productIdCounter++;
         products.put(id, new Product(id, name, description, image, price, stock, unit, category));
@@ -139,7 +144,7 @@ public void ProductUpdated(String id, String name, String description, String im
 
         if (products.isEmpty()) {
             NoProductsFound();
-            return jsonArray.toString();  // Return empty JSON array
+            return jsonArray.toString();
         } else {
             for (Product product : products.values()) {
                 JSONObject jsonObject = new JSONObject();
@@ -151,7 +156,7 @@ public void ProductUpdated(String id, String name, String description, String im
                 }
                 jsonArray.put(jsonObject);
             }
-            return jsonArray.toString(); // Return JSON representation
+            return jsonArray.toString();
         }
     }
 
@@ -163,7 +168,7 @@ public void ProductUpdated(String id, String name, String description, String im
     @SimpleFunction(description = "Remove all products.")
     public void RemoveAllProducts() {
         products.clear();
-        productNames.clear(); // Clear the product name tracking
+        productNames.clear();
         AllProductsRemoved();
     }
 
@@ -190,7 +195,6 @@ public void ProductUpdated(String id, String name, String description, String im
     // ********************* Customers Section *********************
     @SimpleFunction(description = "Adds a new Customer")
 public void RegisterCustomer(String name, String contact, String email, String address, String profilePic, String username, String password) {
-    // Validate inputs
     if (name.isEmpty() || username.isEmpty() || password.length() < 6) {
         InvalidCustomerDetails(username);
         return;
@@ -199,7 +203,7 @@ public void RegisterCustomer(String name, String contact, String email, String a
         CustomerAlreadyExists(username);
     } else {
         String id = "CUST-" + customerIdCounter++;
-        String hashedPassword = hashPassword(password); // Use BCrypt hash for password
+        String hashedPassword = hashPassword(password);
         customers.put(id, new Customer(id, name, contact, email, address, profilePic, username, hashedPassword));
         customerUsernames.put(username, id);
         CustomerAdded(id, name, contact, email, address, username, hashedPassword);
@@ -286,7 +290,7 @@ public void CustomerAdded(String id, String name, String contact, String email, 
 
         if (customers.isEmpty()) {
             NoCustomersFound();
-            return jsonArray.toString();  // Return empty JSON array
+            return jsonArray.toString();
         } else {
             for (Customer customer : customers.values()) {
                 JSONObject jsonObject = new JSONObject();
@@ -298,7 +302,7 @@ public void CustomerAdded(String id, String name, String contact, String email, 
                 }
                 jsonArray.put(jsonObject);
             }
-            return jsonArray.toString(); // Return JSON representation
+            return jsonArray.toString();
         }
     }
 
@@ -310,9 +314,9 @@ public void CustomerAdded(String id, String name, String contact, String email, 
     @SimpleFunction(description = "Update customer profile by ID.")
 public void UpdateCustomerProfile(String id, String name, String contact, String email, String address, String profilePic, String username, String password) {
     if (customers.containsKey(id)) {
-        String hashedPassword = hashPassword(password); // Hash the password before updating
+        String hashedPassword = hashPassword(password);
         customers.get(id).updateProfile(name, contact, email, address, profilePic, username, hashedPassword);
-        CustomerProfileUpdated(id, name, contact, email, address, username, hashedPassword);
+        ProfileUpdated(id, name, contact, email, address, username, hashedPassword);
     } else {
         CustomerNotFound(id);
     }
@@ -320,8 +324,8 @@ public void UpdateCustomerProfile(String id, String name, String contact, String
 
 
     @SimpleEvent(description = "Event triggered when customer profile is updated.")
-    public void CustomerProfileUpdated(String id, String name, String contact, String email, String address, String username, String Password) {
-        EventDispatcher.dispatchEvent(this, "CustomerProfileUpdated", id, name, contact, email, address, username, Password);
+    public void ProfileUpdated(String id, String name, String contact, String email, String address, String username, String Password) {
+        EventDispatcher.dispatchEvent(this, "ProfileUpdated", id, name, contact, email, address, username, Password);
     }
 
     @SimpleEvent(description = "Event triggered when customer is not found.")
@@ -329,136 +333,78 @@ public void UpdateCustomerProfile(String id, String name, String contact, String
         EventDispatcher.dispatchEvent(this, "CustomerNotFound", id);
     }
 
-    // ********************* Password Hashing with LZ4 and XxHash *********************
+    // ********************* Password Hashing with BCrypt *********************
 
     private String hashPassword(String password) {
-    return BCrypt.hashpw(password, BCrypt.gensalt()); // Hash the password using BCrypt
+    return BCrypt.hashpw(password, BCrypt.gensalt());
 }
 
 private boolean verifyPassword(String password, String storedPassword) {
-    return BCrypt.checkpw(password, storedPassword); // Compare the entered password with stored hash
+    return BCrypt.checkpw(password, storedPassword);
 }
+    // ********************* Wishlist Options *********************
 
-    // Product class
-    // Product class
-private class Product {
-    String id;
-    String name;
-    String description;
-    String image;
-    double price;
-    int stock;
-    String unit;
-    String category; // New category field
-
-    // Constructor to initialize Product fields
-    Product(String id, String name, String description, String image, double price, int stock, String unit, String category) {
-        this.id = id;
-        this.name = name;
-        this.description = description;
-        this.image = image;
-        this.price = price;
-        this.stock = stock;
-        this.unit = unit;
-        this.category = category; // Set category during creation
+@SimpleFunction(description = "Add a product to the customer's wishlist")
+public void AddToWishlist(String customerId, String productId) {
+    if (!customers.containsKey(customerId)) {
+        CustomerNotFound(customerId);
+        return;
     }
 
-    // Update product details
-    void updateProduct(String name, String description, String image, double price, int stock, String unit, String category) {
-    this.name = name;
-    this.description = description;
-    this.image = image;
-    this.price = price;
-    this.stock = stock;
-    this.unit = unit;
-    this.category = category; // Update category
-}
-
-    // Validation for product fields
-    boolean isValidProduct() {
-        if (name == null || name.trim().isEmpty()) {
-            System.out.println("Product name cannot be empty.");
-            return false;
-        }
-        if (description == null || description.length() > 200) {
-            System.out.println("Product description is either empty or exceeds the maximum allowed length.");
-            return false;
-        }
-        if (price <= 0) {
-            System.out.println("Product price must be a positive number.");
-            return false;
-        }
-        if (stock < 0) {
-            System.out.println("Product stock cannot be negative.");
-            return false;
-        }
-        if (category == null || category.trim().isEmpty()) {
-            System.out.println("Product category cannot be empty.");
-            return false;
-        }
-        return true;
+    Customer customer = customers.get(customerId);
+    if (products.containsKey(productId)) {
+        customer.addToWishlist(productId);
+        AddedToWishlist(customerId, productId);
+    } else {
+        ProductNotFound(productId);
     }
 }
 
-// Customer class
-private class Customer {
-    String id;
-    String name;
-    String contact;
-    String email;
-    String address;
-    String profilePic;
-    String username;
-    String password; // Store hashed password
+@SimpleEvent(description = "Event triggered when a product is added to the customer's wishlist.")
+public void AddedToWishlist(String customerId, String productId) {
+    EventDispatcher.dispatchEvent(this, "ProductAddedToWishlist", customerId, productId);
+}
 
-    // Constructor to initialize Customer fields
-    Customer(String id, String name, String contact, String email, String address, String profilePic, String username, String password) {
-        this.id = id;
-        this.name = name;
-        this.contact = contact;
-        this.email = email;
-        this.address = address;
-        this.profilePic = profilePic;
-        this.username = username;
-        this.password = password;
+@SimpleFunction(description = "Remove a product from the customer's wishlist")
+public void RemoveFromWishlist(String customerId, String productId) {
+    if (!customers.containsKey(customerId)) {
+        CustomerNotFound(customerId);
+        return;
     }
 
-    // Update customer profile details
-    void updateProfile(String name, String contact, String email, String address, String profilePic, String username, String password) {
-        this.name = name;
-        this.contact = contact;
-        this.email = email;
-        this.address = address;
-        this.profilePic = profilePic;
-        this.username = username;
-        this.password = password;
-    }
-
-    // Validation for customer fields
-    boolean isValidCustomer() {
-        if (username == null || username.trim().isEmpty()) {
-            System.out.println("Username cannot be empty.");
-            return false;
-        }
-        if (email == null || email.trim().isEmpty() || !email.contains("@")) {
-            System.out.println("Invalid email.");
-            return false;
-        }
-        if (password == null || password.length() < 8) {
-            System.out.println("Password must be at least 8 characters long.");
-            return false;
-        }
-        return true;
-    }
-
-    // Password hashing (BCrypt) for secure storage
-    void setPassword(String password) {
-        this.password = BCrypt.hashpw(password, BCrypt.gensalt());
-    }
-
-    // Password validation
-    boolean checkPassword(String password) {
-        return BCrypt.checkpw(password, this.password);
+    Customer customer = customers.get(customerId);
+    if (customer.removeFromWishlist(productId)) {
+        RemovedFromWishlist(customerId, productId);
+    } else {
+        NotFoundInWishlist(productId);
     }
 }
+
+@SimpleEvent(description = "Event triggered when a product is removed from the customer's wishlist.")
+public void RemovedFromWishlist(String customerId, String productId) {
+    EventDispatcher.dispatchEvent(this, "ProductRemovedFromWishlist", customerId, productId);
+}
+
+@SimpleEvent(description = "Event triggered when a product is not found in the wishlist.")
+public void NotFoundInWishlist(String productId) {
+    EventDispatcher.dispatchEvent(this, "NotFoundInWishlist", productId);
+}
+
+@SimpleFunction(description = "Get all items in the customer's wishlist")
+public String GetCustomerWishlist(String customerId) {
+    if (!customers.containsKey(customerId)) {
+        CustomerNotFound(customerId);
+        return "[]";
+    }
+    Customer customer = customers.get(customerId);
+    JSONArray jsonArray = new JSONArray();
+    for (String productId : customer.wishlist.keySet()) {
+        JSONObject jsonObject = new JSONObject();
+        jsonObject.put("productId", productId);
+        jsonObject.put("productName", customer.wishlist.get(productId));
+        jsonArray.put(jsonObject);
+    }
+    return jsonArray.toString();
+}
+
 }

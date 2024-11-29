@@ -12,6 +12,7 @@ public class Customer {
     String username;
     String password;
     HashMap<String, String> wishlist;
+    HashMap<String, Integer> cart;
 
     public Customer(String id, String name, String contact, String email, String address, String profilePic, String username, String password) {
         this.id = id;
@@ -23,6 +24,7 @@ public class Customer {
         this.username = username;
         this.password = password;
         this.wishlist = new HashMap<>();
+        this.cart = new HashMap<>();
     }
 
     public boolean validateCustomerDetails() {
@@ -34,7 +36,6 @@ public class Customer {
     }
 
     private boolean isValidEmail() {
-        // Simple email regex check
         return email != null && email.matches("^[a-zA-Z0-9_+&*-]+(?:\\.[a-zA-Z0-9_+&*-]+)*@(?:[a-zA-Z0-9-]+\\.)+[a-zA-Z]{2,7}$");
     }
 
@@ -54,6 +55,37 @@ public class Customer {
             return true;
         }
         return false;
+    }
+
+    public void addToCart(String productId) {
+        cart.put(productId, cart.getOrDefault(productId, 0) + 1);
+    }
+
+    public boolean removeFromCart(String productId) {
+        if (cart.containsKey(productId)) {
+            int quantity = cart.get(productId);
+            if (quantity > 1) {
+                cart.put(productId, quantity - 1);
+            } else {
+                cart.remove(productId);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public String viewCart() {
+        StringBuilder cartDetails = new StringBuilder();
+        if (cart.isEmpty()) {
+            return "Your cart is empty.";
+        } else {
+            for (String productId : cart.keySet()) {
+                cartDetails.append("Product ID: ").append(productId)
+                           .append(", Quantity: ").append(cart.get(productId))
+                           .append("\n");
+            }
+        }
+        return cartDetails.toString();
     }
 
     public void updateProfile(String name, String contact, String email, String address, String profilePic, String username, String password) {

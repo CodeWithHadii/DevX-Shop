@@ -189,58 +189,6 @@ public class DevxShop extends AndroidNonvisibleComponent {
         EventDispatcher.dispatchEvent(this, "ProductFound", id, name, description, image, price, stock, unit);
     }
 
-    @SimpleFunction(description = "View a product by its ID, returns product details such as name, description, images, stock, price, views, and like status.")
-    public String ViewProductById(String productId) {
-        if (!products.containsKey(productId)) {
-            ProductNotFound(productId);
-            return "{}";
-        }
-
-        Product product = products.get(productId);
-        JSONObject productDetails = new JSONObject();
-
-        try {
-            productDetails.put("productId", product.id);
-            productDetails.put("productName", product.name);
-            productDetails.put("description", product.description);
-            productDetails.put("images", new JSONArray(product.images));
-            productDetails.put("stock", product.stock);
-            productDetails.put("price", product.price);
-            productDetails.put("views", product.views);
-            productDetails.put("likes", product.likes);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-
-        product.incrementViews();
-
-        return productDetails.toString();
-    }
-
-    @SimpleFunction(description = "Like a product by its ID, increments the like count.")
-    public void LikeProduct(String customerId, String productId) {
-        if (!customers.containsKey(customerId)) {
-            CustomerNotFound(customerId);
-            return;
-        }
-
-        if (!products.containsKey(productId)) {
-            ProductNotFound(productId);
-            return;
-        }
-
-        Product product = products.get(productId);
-        product.incrementLikes();
-
-        ProductLiked(customerId, productId);
-    }
-
-    @SimpleEvent(description = "Event triggered when a product is liked.")
-    public void ProductLiked(String customerId, String productId) {
-        EventDispatcher.dispatchEvent(this, "ProductLiked", customerId, productId);
-    }
-
-
     // ********************* Customers Section *********************
     @SimpleFunction(description = "Adds a new Customer")
     public void RegisterCustomer(String name, String contact, String email, String address, String profilePic, String username, String password) {
@@ -478,7 +426,7 @@ public class DevxShop extends AndroidNonvisibleComponent {
         }
 
         if (quantity > product.stock) {
-            InsufficientStock(productId);
+            InsufficientStock(productId, product.stock);
             return;
         }
 
@@ -487,6 +435,12 @@ public class DevxShop extends AndroidNonvisibleComponent {
         customer.cart.put(productId, customer.cart.getOrDefault(productId, 0) + quantity);
         ProductAddedToCart(customerId, productId, quantity);
     }
+
+    @SimpleEvent(description = "Event triggered when there is insufficient stock for the product.")
+    public void InsufficientStock(String productId, int availableStock) {
+        EventDispatcher.dispatchEvent(this, "InsufficientStock", productId, availableStock);
+    }
+
 
     @SimpleEvent(description = "Event triggered when a product is added to the shopping cart.")
     public void ProductAddedToCart(String customerId, String productId, int quantity) {
@@ -580,3 +534,4 @@ public class DevxShop extends AndroidNonvisibleComponent {
     public void InvalidQuantity(int quantity) {
         EventDispatcher.dispatchEvent(this, "InvalidQuantity", quantity);
     }
+}

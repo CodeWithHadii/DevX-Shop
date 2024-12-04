@@ -21,8 +21,8 @@ import com.devxlabs.devxshop.Customer;
 
 @DesignerComponent(
     version = 1,
-    versionName = "1.5",
-    description = "Extension component for DevxShop. Created using Rush.",
+    versionName = "1.6",
+    description = "An E-Commerce Extension for MIT AI2 and its derivatives",
     iconName = "icon.jpeg"
 )
 public class DevxShop extends AndroidNonvisibleComponent {
@@ -188,6 +188,58 @@ public class DevxShop extends AndroidNonvisibleComponent {
     public void ProductFound(String id, String name, String description, String image, double price, int stock, String unit) {
         EventDispatcher.dispatchEvent(this, "ProductFound", id, name, description, image, price, stock, unit);
     }
+
+    @SimpleFunction(description = "View a product by its ID, returns product details such as name, description, images, stock, price, views, and like status.")
+    public String ViewProductById(String productId) {
+        if (!products.containsKey(productId)) {
+            ProductNotFound(productId);
+            return "{}";
+        }
+
+        Product product = products.get(productId);
+        JSONObject productDetails = new JSONObject();
+
+        try {
+            productDetails.put("productId", product.id);
+            productDetails.put("productName", product.name);
+            productDetails.put("description", product.description);
+            productDetails.put("images", new JSONArray(product.images));
+            productDetails.put("stock", product.stock);
+            productDetails.put("price", product.price);
+            productDetails.put("views", product.views);
+            productDetails.put("likes", product.likes);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        product.incrementViews();
+
+        return productDetails.toString();
+    }
+
+    @SimpleFunction(description = "Like a product by its ID, increments the like count.")
+    public void LikeProduct(String customerId, String productId) {
+        if (!customers.containsKey(customerId)) {
+            CustomerNotFound(customerId);
+            return;
+        }
+
+        if (!products.containsKey(productId)) {
+            ProductNotFound(productId);
+            return;
+        }
+
+        Product product = products.get(productId);
+        product.incrementLikes();
+
+        ProductLiked(customerId, productId);
+    }
+
+    @SimpleEvent(description = "Event triggered when a product is liked.")
+    public void ProductLiked(String customerId, String productId) {
+        EventDispatcher.dispatchEvent(this, "ProductLiked", customerId, productId);
+    }
+
 
     // ********************* Customers Section *********************
     @SimpleFunction(description = "Adds a new Customer")
@@ -418,22 +470,21 @@ public class DevxShop extends AndroidNonvisibleComponent {
             return;
         }
 
+        Product product = products.get(productId);
+
         if (quantity <= 0) {
             InvalidQuantity(quantity);
             return;
         }
 
-        Customer customer = customers.get(customerId);
-        Product product = products.get(productId);
-
-        // Check if the product is already in the cart
-        if (customer.cart.containsKey(productId)) {
-            int existingQuantity = customer.cart.get(productId);
-            customer.cart.put(productId, existingQuantity + quantity); // Update the quantity
-        } else {
-            customer.cart.put(productId, quantity); // Add the product to the cart
+        if (quantity > product.stock) {
+            InsufficientStock(productId);
+            return;
         }
 
+        Customer customer = customers.get(customerId);
+
+        customer.cart.put(productId, customer.cart.getOrDefault(productId, 0) + quantity);
         ProductAddedToCart(customerId, productId, quantity);
     }
 
@@ -529,6 +580,3 @@ public class DevxShop extends AndroidNonvisibleComponent {
     public void InvalidQuantity(int quantity) {
         EventDispatcher.dispatchEvent(this, "InvalidQuantity", quantity);
     }
-
-
-}
